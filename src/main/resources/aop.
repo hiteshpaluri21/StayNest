@@ -1,0 +1,93 @@
+package com.staynest.aop;
+
+import org.aspectj.lang.JoinPoint;
+import org.aspectj.lang.ProceedingJoinPoint;
+import org.aspectj.lang.annotation.After;
+import org.aspectj.lang.annotation.AfterReturning;
+import org.aspectj.lang.annotation.AfterThrowing;
+import org.aspectj.lang.annotation.Around;
+import org.aspectj.lang.annotation.Aspect;
+import org.aspectj.lang.annotation.Before;
+import org.aspectj.lang.annotation.Pointcut;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Component;
+
+@Aspect
+@Component
+public class LoggingAspect {
+
+	private static final Logger logger = LoggerFactory.getLogger(LoggingAspect.class);
+
+	// ─── POINTCUT DEFINITIONS ──────────────────────────────────────────────
+	@Pointcut("execution(* com.staynest.controller.*.*(..))")
+	public void controllerMethods() {}
+
+	@Pointcut("execution(* com.staynest.serviceImplementation.*.*(..))")
+	public void serviceMethods() {}
+
+	@Pointcut("controllerMethods() || serviceMethods()")
+	public void applicationMethods() {}
+
+	// ─── BEFORE ────────────────────────────────────────────────────────────
+	@Before("controllerMethods()")
+	public void beforeController(JoinPoint jp) {
+		logger.trace("Entering controller method: {}", jp.getSignature().getName());
+		logger.debug("Controller called: {} | Args: {}", jp.getSignature().getName(), jp.getArgs());
+	}
+
+	@Before("serviceMethods()")
+	public void beforeService(JoinPoint jp) {
+		logger.trace("Entering service method: {}", jp.getSignature().getName());
+		logger.debug("Service called: {} | Args: {}", jp.getSignature().getName(), jp.getArgs());
+	}
+
+	// ─── AFTER ─────────────────────────────────────────────────────────────
+	@After("controllerMethods()")
+	public void afterController(JoinPoint jp) {
+		logger.trace("Exiting controller method: {}", jp.getSignature().getName());
+	}
+
+	@After("serviceMethods()")
+	public void afterService(JoinPoint jp) {
+		logger.trace("Exiting service method: {}", jp.getSignature().getName());
+	}
+
+	// ─── AFTER RETURNING ───────────────────────────────────────────────────
+	@AfterReturning(pointcut = "controllerMethods()", returning = "result")
+	public void afterReturningController(JoinPoint jp, Object result) {
+		logger.info("Controller method {} SUCCESS | Response: {}", jp.getSignature().getName(), result);
+	}
+
+	@AfterReturning(pointcut = "serviceMethods()", returning = "result")
+	public void afterReturningService(JoinPoint jp, Object result) {
+		logger.info("Service method {} SUCCESS | Result: {}", jp.getSignature().getName(), result);
+	}
+
+	// ─── AFTER THROWING ────────────────────────────────────────────────────
+	@AfterThrowing(pointcut = "controllerMethods()", throwing = "ex")
+	public void afterThrowingController(JoinPoint jp, Exception ex) {
+		logger.error("EXCEPTION in controller method: {} | Message: {}",
+				jp.getSignature().getName(), ex.getMessage());
+	}
+
+	@AfterThrowing(pointcut = "serviceMethods()", throwing = "ex")
+	public void afterThrowingService(JoinPoint jp, Exception ex) {
+		logger.error("EXCEPTION in service method: {} | Message: {}",
+				jp.getSignature().getName(), ex.getMessage());
+	}
+
+	// ─── AROUND (Execution Time) ────────────────────────────────────────────
+	@Around("applicationMethods()")
+	public Object measureExecutionTime(ProceedingJoinPoint pjp) throws Throwable {
+		long   start     = System.currentTimeMillis();
+		Object result    = pjp.proceed();
+		long   timeTaken = System.currentTimeMillis() - start;
+		if (timeTaken > 1000) {
+			logger.warn("SLOW METHOD: {} took {}ms", pjp.getSignature().getName(), timeTaken);
+		} else {
+			logger.debug("Method {} completed in {}ms", pjp.getSignature().getName(), timeTaken);
+		}
+		return result;
+	}
+}
